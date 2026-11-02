@@ -1,36 +1,34 @@
-# anki-mcp
+# Claude/Codex MCP for Anki (branch `cian`)
 
-MCP server that runs *inside* Anki (as an add-on), so any agent edits the live collection
-while Anki is open — no closing Anki, no collection-lock dance.
+This fork is Anki built from source and installed as /Applications/Anki.app, plus an MCP that
+gives agents direct access to the collection whether or not Anki is open.
 
-- Lives in the `cian` branch of the Anki fork at `~/Desktop/anki/claude/`. Built app: /Applications/Anki.app.
-- `update-anki.sh` (launchd `com.cian.anki-update`, at login + 04:00/13:00) merges new upstream stable tags, rebuilds, reinstalls; log ~/Library/Logs/anki-update.log.
-- Add-on: `anki_mcp/` symlinked into `~/Library/Application Support/Anki2/addons21/anki_mcp`.
-- Endpoint: `http://127.0.0.1:27701/mcp` (MCP streamable HTTP), header
-  `Authorization: Bearer $(cat anki_mcp/user_files/token)`.
-
-Tools: `list_decks`, `list_notetypes`, `find_notes`, `add_notes`, `update_notes`, `delete_notes`,
-`get_notetype`, `update_notetype` (card templates/CSS/fields, clone), `set_ui_css` (theme Anki's own UI),
-`run_python` (anything an add-on can do), `sync` (AnkiWeb).
-Each write call = one Anki undo step named `MCP: <tool>`.
+- `anki_mcp/server.py`: the MCP agents launch (stdio). Anki open → forwards to the in-app server
+  (live UI, one undo step per call). Anki closed → opens `User 1/collection.anki2` itself.
+- `anki_mcp/__init__.py`: Anki add-on (symlinked into `addons21/anki_mcp`), in-app server on
+  127.0.0.1:27701 with a bearer token in `anki_mcp/user_files/token`.
+- `anki_mcp/tools.py`: the tools: list_decks, list_notetypes, find_notes, add_notes, update_notes,
+  delete_notes, get_notetype, update_notetype, set_ui_css, run_python, sync, update_anki.
+- `update-anki.sh` + `com.cian.anki-update.plist` (launchd: at login, 04:00, 13:00): merges the newest
+  upstream stable tag into `cian`, rebuilds, reinstalls /Applications/Anki.app (waits if Anki is open).
+  Log: ~/Library/Logs/anki-update.log.
 
 ## Connect an agent
 
 ```sh
-# Claude Code (done)
-claude mcp add --scope user --transport http anki http://127.0.0.1:27701/mcp \
-  --header "Authorization: Bearer $(cat anki_mcp/user_files/token)"
+claude mcp add -s user anki -- ~/src/anki/out/pyenv/bin/python ~/src/anki/claude/anki_mcp/server.py
 ```
 
 ```toml
-# Codex ~/.codex/config.toml (done)
+# ~/.codex/config.toml
 [mcp_servers.anki]
-url = "http://127.0.0.1:27701/mcp"
-http_headers = { Authorization = "Bearer <token>" }
+command = "/Users/cianmcnally/src/anki/out/pyenv/bin/python"
+args = ["/Users/cianmcnally/src/anki/claude/anki_mcp/server.py"]
 ```
 
-Anything else: point its MCP HTTP client at the URL with that header.
+Any other agent: run the same command as a stdio MCP server.
 
 ## Check
 
-With Anki open: `python3 smoke_test.py` (creates and removes its own deck/note type).
+`out/pyenv/bin/python claude/smoke_test.py`: every tool, run headless on a temp copy of the collection,
+plus a read-only live call.

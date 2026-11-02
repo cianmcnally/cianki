@@ -4,7 +4,7 @@
 <dict>
   <key>Label</key><string>com.cian.anki-update</string>
   <key>ProgramArguments</key>
-  <array><string>/Users/cianmcnally/Desktop/anki/claude/update-anki.sh</string></array>
+  <array><string>/Users/cianmcnally/src/anki/claude/update-anki.sh</string></array>
   <key>RunAtLoad</key><true/>
   <key>StartCalendarInterval</key>
   <array>

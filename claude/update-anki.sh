@@ -13,7 +13,7 @@ notify() { echo "$1"; osascript -e "display notification \"$1\" with title \"Ank
 anki_running() { pgrep -f "$APP/Contents/MacOS/Anki" >/dev/null || pgrep -f "tools/run.py" >/dev/null; }
 
 [ "$(git branch --show-current)" = cian ] || { notify "not on branch cian - skipped"; exit 1; }
-[ -z "$(git status --porcelain --untracked-files=no)" ] || { notify "uncommitted changes in ~/Desktop/anki - skipped"; exit 1; }
+[ -z "$(git status --porcelain --untracked-files=no)" ] || { notify "uncommitted changes in ~/src/anki - skipped"; exit 1; }
 
 git fetch --quiet --tags origin
 # stable releases only (26.09.3), not betas/rc (26.09b2)
