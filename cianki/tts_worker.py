@@ -17,6 +17,8 @@ FFMPEG = shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
 # cached model -> skip the hub's network check, so startup is instant/offline
 constants.HF_HUB_OFFLINE = isinstance(try_to_load_from_cache(MODEL, "config.json"), str)
 model = load_model(MODEL)
+# players clip/glitch the first moments of a clip, so lead with 200 ms of silence
+LEAD_SILENCE = np.zeros(int(24000 * 0.2), dtype=np.float32)
 reply = sys.stdout
 sys.stdout = sys.stderr  # keep library prints off the protocol channel
 
@@ -51,7 +53,7 @@ for line in sys.stdin:
                 "4",
                 tmp,
             ],
-            input=np.concatenate(parts).tobytes(),
+            input=np.concatenate([LEAD_SILENCE, *parts]).tobytes(),
             check=True,
         )
         os.replace(
