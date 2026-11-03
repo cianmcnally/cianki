@@ -6,10 +6,12 @@ from __future__ import annotations
 import aqt
 import aqt.forms
 import aqt.operations
+from anki import cianki_tts
 from anki.collection import OpChanges
 from anki.lang import without_unicode_isolation
 from anki.models import NotetypeDict
 from aqt import AnkiQt, gui_hooks
+from aqt.operations import CollectionOp
 from aqt.operations.notetype import update_notetype_legacy
 from aqt.qt import *
 from aqt.schema_change_tracker import ChangeTracker
@@ -64,6 +66,12 @@ class FieldDialog(QDialog):
         save_button = self.form.buttonBox.button(QDialogButtonBox.StandardButton.Save)
         assert save_button is not None
         save_button.setAutoDefault(False)
+
+        # Cianki: local text-to-speech toggle (not in fields.ui; no ftl string)
+        self.tts = QCheckBox("Generate audio with local text-to-speech")
+        self.form._2.addWidget(self.tts, 7, 1, Qt.AlignmentFlag.AlignLeft)
+        qconnect(self.tts.clicked, self.onTts)
+        self.tts_enabled: list[str] = []
 
         self.currentIdx: int | None = None
         self.fillFields()
@@ -166,6 +174,33 @@ class FieldDialog(QDialog):
         self.fillFields()
         self.form.fieldList.setCurrentRow(idx)
 
+    def onTts(self, checked: bool) -> None:
+        if self.currentIdx is None:
+            return
+        idx = self.currentIdx
+        fld = self.model["flds"][idx]
+        audio = cianki_tts.audio_field_name(fld["name"])
+        if not checked:
+            fld.pop(cianki_tts.FLAG, None)
+            self.change_tracker.mark_basic()
+            return
+        if not cianki_tts.available():
+            show_warning(
+                "Local text-to-speech isn't installed. Run cianki/setup-tts.sh in the Cianki repo."
+            )
+            self.tts.setChecked(False)
+            return
+        if audio not in self.mm.field_names(self.model):
+            if not self.change_tracker.mark_schema():
+                self.tts.setChecked(False)
+                return
+        self.change_tracker.mark_basic()
+        self.saveField()
+        cianki_tts.enable_field(self.col, self.model, fld["name"])
+        self.tts_enabled.append(fld["name"])
+        self.fillFields()
+        self.form.fieldList.setCurrentRow(idx)
+
     def onAdd(self) -> None:
         name = self._uniqueName(tr.fields_field_name())
         if not name:
@@ -243,6 +278,8 @@ class FieldDialog(QDialog):
         f.collapseByDefault.setChecked(fld["collapsed"])
         f.excludeFromSearch.setChecked(fld["excludeFromSearch"])
         f.fieldDescription.setText(fld.get("description", ""))
+        self.tts.setChecked(bool(fld.get(cianki_tts.FLAG)))
+        self.tts.setEnabled(not fld["name"].endswith(" Audio"))
 
     def saveField(self) -> None:
         # not initialized yet?
@@ -297,6 +334,12 @@ class FieldDialog(QDialog):
         def on_done(changes: OpChanges) -> None:
             tooltip(tr.card_templates_changes_saved(), parent=self.parentWidget())
             QDialog.accept(self)
+            if self.tts_enabled:  # Cianki: fill audio for existing notes
+                nt = self.mm.get(self.model["id"])
+                assert nt is not None
+                CollectionOp(
+                    self.mw, lambda col: cianki_tts.backfill(col, nt)
+                ).run_in_background()
 
         update_notetype_legacy(
             parent=self.mw, notetype=self.model, skip_checks=True

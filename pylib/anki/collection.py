@@ -1337,3 +1337,9 @@ def pb_export_limit(limit: ExportLimit) -> import_export_pb2.ExportLimit:
     else:
         message.whole_collection.SetInParent()
     return message
+
+
+# Cianki: keep local-TTS audio fields in step with their text fields.
+from anki import cianki_tts  # noqa: E402
+
+hooks.note_will_flush.append(cianki_tts.on_note_will_flush)
